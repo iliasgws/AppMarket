@@ -1,15 +1,12 @@
-name: Android CI
+name: Android Debug APK
 
 on:
   workflow_dispatch:
   push:
     branches: ["main"]
-    tags:
-      - "v*"
-    paths-ignore:
-      - "README.md"
-      - "doc/*"
-      - ".github/workflows/android.yml"
+
+permissions:
+  contents: read
 
 jobs:
   build:
@@ -30,31 +27,17 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
 
-      - name: Decode Signing Key
-        run: echo ${{ secrets.SIGNING_KEY }} | base64 -d > keystore.jks
+      - name: Build Debug APK
+        run: ./gradlew :app:android:assembleDebug
 
-      - name: Build Release APK
-        run: |
-          ./gradlew :app:android:assembleRelease
-          echo "APK_FILE=$(find app/android/build/outputs/apk/release -name '*.apk' | head -n 1)" >> $GITHUB_ENV
-        env:
-          KEYSTORE_PATH: ${{ github.workspace }}/keystore.jks
-          KEYSTORE_PASS: ${{ secrets.KEY_STORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-
-      - name: Upload APK Artifact
-        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
-        uses: actions/upload-artifact@v7
+      - name: Upload Debug APK
+        uses: actions/upload-artifact@v4
         with:
-          path: ${{ env.APK_FILE }}
-          archive: false
+          name: AppMarket-debug-apk
+          path: app/android/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
 
-      - name: Display APK Hashes
+      - name: Display APK SHA256
         run: |
-          echo "### APK Hashes" >> $GITHUB_STEP_SUMMARY
-          echo "| Hash Type | Hash Value |" >> $GITHUB_STEP_SUMMARY
-          echo "| --- | --- |" >> $GITHUB_STEP_SUMMARY
-          echo "| SHA256 | \`$(sha256sum "$APK_FILE" | awk '{ print $1 }')\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| SHA1 | \`$(sha1sum "$APK_FILE" | awk '{ print $1 }')\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| MD5 | \`$(md5sum "$APK_FILE" | awk '{ print $1 }')\` |" >> $GITHUB_STEP_SUMMARY
+          echo "### APK SHA256" >> "$GITHUB_STEP_SUMMARY"
+          sha256sum app/android/build/outputs/apk/debug/*.apk >> "$GITHUB_STEP_SUMMARY"
